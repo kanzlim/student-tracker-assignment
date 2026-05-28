@@ -11,6 +11,7 @@ const activeTab = ref('assignments')
 const editingId = ref(null)
 const isLoading = ref(false)
 const isUploading = ref(false)
+const showLogoutModal = ref(false)
 
 const toast = ref({
   show: false,
@@ -329,9 +330,26 @@ const updateGrade = async (submission, grade) => {
   )
 }
 
-const logout = () => {
+const openLogoutModal = () => {
+  showLogoutModal.value = true
+}
+
+const cancelLogout = () => {
+  showLogoutModal.value = false
+}
+
+const confirmLogout = () => {
   localStorage.removeItem('currentUser')
-  router.push('/')
+
+  showLogoutModal.value = false
+
+  showToast(
+    'Logged out successfully.'
+  )
+
+  setTimeout(() => {
+    router.push('/')
+  }, 1000)
 }
 </script>
 
@@ -362,10 +380,45 @@ const logout = () => {
         </router-link>
       </nav>
 
-      <button class="logout-btn" @click="logout">
+      <button class="logout-btn" @click="openLogoutModal">
         Logout
       </button>
     </aside>
+
+    <div
+      v-if="showLogoutModal"
+      class="modal-overlay"
+    >
+      <div class="logout-modal">
+        <div class="modal-icon">
+          🚪
+        </div>
+
+        <h2>
+          Logout Confirmation
+        </h2>
+
+        <p>
+          Are you sure you want to logout?
+        </p>
+
+        <div class="modal-actions">
+          <button
+            class="cancel-logout"
+            @click="cancelLogout"
+          >
+            Cancel
+          </button>
+
+          <button
+            class="confirm-logout"
+            @click="confirmLogout"
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
 
     <section class="content">
       <div
@@ -812,6 +865,91 @@ const logout = () => {
   }
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.logout-modal {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border-radius: 22px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  animation: popIn .25s ease;
+}
+
+.modal-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #b91c1c;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  margin: 0 auto 14px;
+}
+
+.logout-modal h2 {
+  font-size: 24px;
+  font-weight: 900;
+  color: #020817;
+  margin-bottom: 8px;
+}
+
+.logout-modal p {
+  color: #64748b;
+  font-size: 15px;
+  margin-bottom: 22px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.cancel-logout,
+.confirm-logout {
+  flex: 1;
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cancel-logout {
+  background: #e2e8f0;
+  color: #020817;
+}
+
+.confirm-logout {
+  background: #ef4444;
+  color: white;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -1188,6 +1326,10 @@ a {
   .assignment-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .modal-actions {
+    flex-direction: column;
   }
 }
 </style>
