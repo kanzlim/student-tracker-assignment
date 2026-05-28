@@ -164,8 +164,21 @@ const deleteAnnouncement = async (announcement) => {
 }
 
 const logout = () => {
-  localStorage.removeItem('currentUser')
-  router.push('/')
+  const confirmLogout = confirm(
+    'Are you sure you want to logout?'
+  )
+
+  if (confirmLogout) {
+    localStorage.removeItem('currentUser')
+
+    showNotification(
+      'Logged out successfully.'
+    )
+
+    setTimeout(() => {
+      router.push('/')
+    }, 1000)
+  }
 }
 </script>
 
