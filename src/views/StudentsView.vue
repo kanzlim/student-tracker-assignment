@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { supabase } from '../supabase'
 
 const router = useRouter()
 
@@ -20,19 +21,38 @@ const form = ref({
   status: 'Enrolled'
 })
 
-onMounted(() => {
-  students.value =
-    JSON.parse(localStorage.getItem('students')) || []
+onMounted(async () => {
+  await loadStudents()
 })
 
-const totalStudents = computed(() =>
-  students.value.length
-)
+const loadStudents = async () => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('role', 'student')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error(error)
+    alert('Failed to load students.')
+    return
+  }
+
+  students.value = data.map(student => ({
+    studentId: student.id,
+    fullName: student.full_name,
+    name: student.full_name,
+    email: student.email,
+    course: student.course,
+    yearLevel: student.year_level,
+    status: student.status || 'Enrolled'
+  }))
+}
+
+const totalStudents = computed(() => students.value.length)
 
 const enrolledStudents = computed(() =>
-  students.value.filter(
-    student => student.status === 'Enrolled'
-  ).length
+  students.value.filter(student => student.status === 'Enrolled').length
 )
 
 const filteredStudents = computed(() => {
@@ -49,13 +69,6 @@ const filteredStudents = computed(() => {
   })
 })
 
-const saveStudents = () => {
-  localStorage.setItem(
-    'students',
-    JSON.stringify(students.value)
-  )
-}
-
 const resetForm = () => {
   form.value = {
     studentId: '',
@@ -69,7 +82,7 @@ const resetForm = () => {
   editingId.value = null
 }
 
-const addStudent = () => {
+const addStudent = async () => {
   if (
     !form.value.fullName ||
     !form.value.email ||
@@ -81,41 +94,50 @@ const addStudent = () => {
   }
 
   if (editingId.value) {
-    const index = students.value.findIndex(
-      student => student.studentId === editingId.value
-    )
-
-    if (index !== -1) {
-      students.value[index] = {
-        studentId: editingId.value,
-        fullName: form.value.fullName,
-        name: form.value.fullName,
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: form.value.fullName,
         email: form.value.email,
         course: form.value.course,
-        yearLevel: form.value.yearLevel,
-        status: form.value.status
-      }
+        year_level: form.value.yearLevel,
+        status: form.value.status,
+        role: 'student'
+      })
+      .eq('id', editingId.value)
+
+    if (error) {
+      console.error(error)
+      alert('Failed to update student.')
+      return
     }
 
-    editingId.value = null
+    alert('Student updated successfully.')
   } else {
-    students.value.push({
-      studentId: `STU-${Math.floor(
-        100000 + Math.random() * 900000
-      )}`,
-      fullName: form.value.fullName,
-      name: form.value.fullName,
-      email: form.value.email,
-      course: form.value.course,
-      yearLevel: form.value.yearLevel,
-      status: form.value.status
-    })
+    const { error } = await supabase
+      .from('profiles')
+      .insert([
+        {
+          full_name: form.value.fullName,
+          email: form.value.email,
+          course: form.value.course,
+          year_level: form.value.yearLevel,
+          status: form.value.status,
+          role: 'student'
+        }
+      ])
+
+    if (error) {
+      console.error(error)
+      alert('Failed to save student.')
+      return
+    }
+
+    alert('Student saved successfully.')
   }
 
-  saveStudents()
   resetForm()
-
-  alert('Student saved successfully.')
+  await loadStudents()
 }
 
 const editStudent = (student) => {
@@ -131,32 +153,24 @@ const editStudent = (student) => {
   }
 }
 
-const deleteStudent = (studentId) => {
-  if (confirm('Delete this student permanently?')) {
-    students.value = students.value.filter(
-      student => student.studentId !== studentId
-    )
-
-    const studentAccounts =
-      JSON.parse(localStorage.getItem('studentAccounts')) || []
-
-    const updatedAccounts = studentAccounts.filter(
-      account => account.id !== studentId
-    )
-
-    const submissions =
-      JSON.parse(localStorage.getItem('submissions')) || []
-
-    const updatedSubmissions = submissions.filter(
-      submission => submission.studentId !== studentId
-    )
-
-    localStorage.setItem('students', JSON.stringify(students.value))
-    localStorage.setItem('studentAccounts', JSON.stringify(updatedAccounts))
-    localStorage.setItem('submissions', JSON.stringify(updatedSubmissions))
-
-    alert('Student account permanently deleted.')
+const deleteStudent = async (studentId) => {
+  if (!confirm('Delete this student permanently?')) {
+    return
   }
+
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', studentId)
+
+  if (error) {
+    console.error(error)
+    alert('Failed to delete student.')
+    return
+  }
+
+  alert('Student account permanently deleted.')
+  await loadStudents()
 }
 
 const searchStudent = () => {
@@ -167,7 +181,7 @@ const searchStudent = () => {
 
   const found = students.value.find(
     student =>
-      student.studentId.toLowerCase() ===
+      String(student.studentId).toLowerCase() ===
       searchId.value.trim().toLowerCase()
   )
 
