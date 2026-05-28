@@ -1,19 +1,19 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { supabase } from '../lib/supabase'
 
 const router = useRouter()
 
 const currentUser = ref({})
-
 const students = ref([])
 const assignments = ref([])
 const announcements = ref([])
+const submissions = ref([])
 const instructorAccounts = ref([])
 
-onMounted(() => {
-  const savedUser =
-    JSON.parse(localStorage.getItem('currentUser'))
+onMounted(async () => {
+  const savedUser = JSON.parse(localStorage.getItem('currentUser'))
 
   if (!savedUser) {
     router.push('/')
@@ -22,49 +22,52 @@ onMounted(() => {
 
   currentUser.value = savedUser
 
-  students.value =
-    JSON.parse(localStorage.getItem('students')) || []
-
-  assignments.value =
-    JSON.parse(localStorage.getItem('assignments')) || []
-
-  announcements.value =
-    JSON.parse(localStorage.getItem('announcements')) || []
-
-  instructorAccounts.value =
-    JSON.parse(localStorage.getItem('instructorAccounts')) || []
+  await loadDashboardData()
 })
 
-const totalStudents = computed(() =>
-  students.value.length
-)
+const loadDashboardData = async () => {
+  const { data: profilesData } = await supabase
+    .from('profiles')
+    .select('*')
 
-const totalAssignments = computed(() =>
-  assignments.value.length
-)
+  const { data: assignmentsData } = await supabase
+    .from('assignments')
+    .select('*')
 
-const totalAnnouncements = computed(() =>
-  announcements.value.length
-)
+  const { data: announcementsData } = await supabase
+    .from('announcements')
+    .select('*')
 
-const totalEnrollments = computed(() =>
-  students.value.filter(
-    student => student.status === 'Enrolled'
-  ).length
-)
+  const { data: submissionsData } = await supabase
+    .from('submissions')
+    .select('*')
+
+  students.value = profilesData?.filter(profile => profile.role === 'student') || []
+  instructorAccounts.value = profilesData?.filter(
+    profile => profile.role === 'instructor' || profile.role === 'admin'
+  ) || []
+
+  assignments.value = assignmentsData || []
+  announcements.value = announcementsData || []
+  submissions.value = submissionsData || []
+}
+
+const totalStudents = computed(() => students.value.length)
+
+const totalAssignments = computed(() => assignments.value.length)
+
+const totalAnnouncements = computed(() => announcements.value.length)
+
+const totalSubmissions = computed(() => submissions.value.length)
+
+const totalEnrollments = computed(() => students.value.length)
 
 const totalInstructors = computed(() =>
-  instructorAccounts.value.filter(
-    account =>
-      account.role === 'instructor'
-  ).length
+  instructorAccounts.value.filter(account => account.role === 'instructor').length
 )
 
 const totalAdmins = computed(() =>
-  instructorAccounts.value.filter(
-    account =>
-      account.role === 'admin'
-  ).length
+  instructorAccounts.value.filter(account => account.role === 'admin').length
 )
 
 const logout = () => {
@@ -79,46 +82,28 @@ const logout = () => {
       <h1>Student Tracker</h1>
 
       <nav class="menu">
-        <router-link
-          to="/dashboard"
-          class="nav active"
-        >
+        <router-link to="/dashboard" class="nav active">
           Dashboard
         </router-link>
 
-        <router-link
-          to="/students"
-          class="nav"
-        >
+        <router-link to="/students" class="nav">
           Students
         </router-link>
 
-        <router-link
-          to="/assignments"
-          class="nav"
-        >
+        <router-link to="/assignments" class="nav">
           Assignments
         </router-link>
 
-        <router-link
-          to="/announcements"
-          class="nav"
-        >
+        <router-link to="/announcements" class="nav">
           Announcements
         </router-link>
 
-        <router-link
-          to="/settings"
-          class="nav"
-        >
+        <router-link to="/settings" class="nav">
           Settings
         </router-link>
       </nav>
 
-      <button
-        class="logout-btn"
-        @click="logout"
-      >
+      <button class="logout-btn" @click="logout">
         Logout
       </button>
     </aside>
@@ -130,7 +115,7 @@ const logout = () => {
 
           <p>
             Welcome back,
-            {{ currentUser.fullName }}
+            {{ currentUser.fullName || currentUser.full_name || 'User' }}
           </p>
         </div>
 
@@ -141,58 +126,38 @@ const logout = () => {
 
       <div class="cards">
         <div class="card">
-          <div class="icon">
-            🎓
-          </div>
+          <div class="icon">🎓</div>
 
           <div>
             <span>Students</span>
-
-            <h3>
-              {{ totalStudents }}
-            </h3>
+            <h3>{{ totalStudents }}</h3>
           </div>
         </div>
 
         <div class="card">
-          <div class="icon purple">
-            📄
-          </div>
+          <div class="icon purple">📄</div>
 
           <div>
             <span>Assignments</span>
-
-            <h3>
-              {{ totalAssignments }}
-            </h3>
+            <h3>{{ totalAssignments }}</h3>
           </div>
         </div>
 
         <div class="card">
-          <div class="icon green">
-            📝
-          </div>
+          <div class="icon green">📝</div>
 
           <div>
-            <span>Enrollments</span>
-
-            <h3>
-              {{ totalEnrollments }}
-            </h3>
+            <span>Submissions</span>
+            <h3>{{ totalSubmissions }}</h3>
           </div>
         </div>
 
         <div class="card">
-          <div class="icon orange">
-            📢
-          </div>
+          <div class="icon orange">📢</div>
 
           <div>
             <span>Announcements</span>
-
-            <h3>
-              {{ totalAnnouncements }}
-            </h3>
+            <h3>{{ totalAnnouncements }}</h3>
           </div>
         </div>
       </div>
@@ -203,50 +168,32 @@ const logout = () => {
 
           <div class="info-row">
             <span>Total Students</span>
-
-            <strong>
-              {{ totalStudents }}
-            </strong>
+            <strong>{{ totalStudents }}</strong>
           </div>
 
           <div class="info-row">
             <span>Total Assignments</span>
-
-            <strong>
-              {{ totalAssignments }}
-            </strong>
+            <strong>{{ totalAssignments }}</strong>
           </div>
 
           <div class="info-row">
-            <span>Total Enrollments</span>
-
-            <strong>
-              {{ totalEnrollments }}
-            </strong>
+            <span>Total Submissions</span>
+            <strong>{{ totalSubmissions }}</strong>
           </div>
 
           <div class="info-row">
             <span>Total Announcements</span>
-
-            <strong>
-              {{ totalAnnouncements }}
-            </strong>
+            <strong>{{ totalAnnouncements }}</strong>
           </div>
 
           <div class="info-row">
             <span>Total Instructors</span>
-
-            <strong>
-              {{ totalInstructors }}
-            </strong>
+            <strong>{{ totalInstructors }}</strong>
           </div>
 
           <div class="info-row">
             <span>Total Admins</span>
-
-            <strong>
-              {{ totalAdmins }}
-            </strong>
+            <strong>{{ totalAdmins }}</strong>
           </div>
         </div>
 
@@ -254,18 +201,15 @@ const logout = () => {
           <h3>Dashboard Info</h3>
 
           <div class="message">
-            The dashboard automatically updates based on the students,
-            assignments, enrollments, and announcements you create.
+            The dashboard automatically updates based on the data saved in Supabase.
           </div>
 
           <div class="message">
-            Announcements can now be posted by course and year level,
-            then shown only to matching students.
+            Students are counted from the profiles table where role is student.
           </div>
-          
+
           <div class="message">
-            All data is currently saved using localStorage. Later,
-            this can connect to Supabase or Laravel backend database.
+            Assignments, submissions, and announcements are loaded from their Supabase tables.
           </div>
         </div>
       </div>
